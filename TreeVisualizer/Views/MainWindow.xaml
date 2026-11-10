@@ -1,0 +1,191 @@
+﻿<Window x:Class="TreeVisualizer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Визуализатор бинарного дерева" Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Панель управления -->
+        <Border Background="#F3F3F3" BorderBrush="#CCCCCC" BorderThickness="0,0,0,1" Padding="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Входная строка:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+                <TextBox Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}" 
+                         Width="300" Margin="0,0,15,0" FontSize="14" VerticalContentAlignment="Center"
+                         IsEnabled="{Binding IsNotRunning}"/>
+                <Button Content="Построить" Command="{Binding StartCommand}" Padding="15,5" Margin="0,0,10,0"/>
+                <Button Content="Сброс" Command="{Binding ResetCommand}" Padding="15,5" Margin="0,0,20,0"/>
+
+                <!-- Блок масштаба со слайдером -->
+                <TextBlock Text="Масштаб:" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+
+                <!-- Кнопка уменьшения (опционально, для точной подстройки) -->
+                <Button Content="-" Command="{Binding ZoomOutCommand}" Width="25" Margin="0,0,10,0"/>
+
+                <!-- Слайдер -->
+                <Slider Value="{Binding Scale, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                        Minimum="0.2" Maximum="3.0" 
+                        Width="150" VerticalAlignment="Center" 
+                        TickFrequency="0.1" IsSnapToTickEnabled="False"
+                        Margin="0,0,10,0"/>
+
+                <!-- Кнопка увеличения (опционально) -->
+                <Button Content="+" Command="{Binding ZoomInCommand}" Width="25" Margin="0,0,15,0"/>
+
+                <!-- Текстовое отображение текущего масштаба (например, "1.0x") -->
+                <TextBlock Text="{Binding Scale, StringFormat={}{0:0.0}x}" 
+                           VerticalAlignment="Center" Width="40" FontWeight="SemiBold" Foreground="#555555"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Основная область -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="350"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Холст для дерева -->
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#FAFAFA">
+
+                <!-- Центрируем Grid -->
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                    <!-- Применяем масштаб -->
+                    <Grid.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                    </Grid.LayoutTransform>
+
+                    <!-- Холст с размерами из ViewModel -->
+                    <Canvas Width="{Binding TreeWidth}" Height="{Binding TreeHeight}">
+
+                        <!-- Линии связей -->
+                        <ItemsControl ItemsSource="{Binding Connections}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Line X1="{Binding StartX}" Y1="{Binding StartY}" X2="{Binding EndX}" Y2="{Binding EndY}" 
+                                          Stroke="#555555" StrokeThickness="1.5"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Узлы (ПОЛНЫЙ DataTemplate) -->
+                        <ItemsControl ItemsSource="{Binding Nodes}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                    <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Width="60" Height="40">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Значение узла (клик = удалить, если лист) -->
+                                        <Border Grid.Row="0" BorderBrush="Black" BorderThickness="1,1,1,0" Background="White"
+                                                MouseLeftButtonDown="NodeValue_MouseLeftButtonDown">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Cursor" Value="Arrow"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLeaf}" Value="True">
+                                                            <Setter Property="Cursor" Value="Hand"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="{Binding Value}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" FontSize="14"/>
+                                        </Border>
+
+                                        <!-- Указатели (Левый и Правый) -->
+                                        <Grid Grid.Row="1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Левый указатель -->
+                                            <Border Grid.Column="0" BorderBrush="Black" BorderThickness="1,0,1,1" Background="#F9F9F9">
+                                                <TextBlock Text="{Binding LeftText}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9" Foreground="Gray"
+                                                           MouseLeftButtonDown="LeftNull_MouseLeftButtonDown">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Cursor" Value="Arrow"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding LeftText}" Value="NULL">
+                                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+
+                                            <!-- Правый указатель -->
+                                            <Border Grid.Column="1" BorderBrush="Black" BorderThickness="0,0,1,1" Background="#F9F9F9">
+                                                <TextBlock Text="{Binding RightText}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9" Foreground="Gray"
+                                                           MouseLeftButtonDown="RightNull_MouseLeftButtonDown">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Cursor" Value="Arrow"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RightText}" Value="NULL">
+                                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Canvas>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Панель логов (ПОЛНЫЙ код) -->
+            <Border Grid.Column="1" BorderBrush="#CCCCCC" BorderThickness="1,0,0,0" Background="#FFFFFF">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Логи выполнения" FontWeight="Bold" Margin="10" FontSize="14"/>
+
+                    <ScrollViewer x:Name="LogScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="10,0,10,10">
+                        <ItemsControl x:Name="LogsItemsControl" ItemsSource="{Binding Logs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#EEEEEE" BorderThickness="0,0,0,1" Padding="0,5">
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
